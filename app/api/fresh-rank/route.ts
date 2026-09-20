@@ -105,7 +105,7 @@ async function visionBatch(items:Meme[]) {
 
   try {
     const result = await generateText({
-      model:"openai/gpt-5.6-luna",
+      model:"inclusionai/ling-3.0-flash-vl-free",
       maxOutputTokens:1800,
       messages:[{role:"user",content}],
     });
