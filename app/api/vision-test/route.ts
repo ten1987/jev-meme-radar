@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const result = await generateText({
-      model:"openai/gpt-5.6-luna",
+      model:"inclusionai/ling-3.0-flash-vl-free",
       maxOutputTokens:300,
       messages:[{
         role:"user",
