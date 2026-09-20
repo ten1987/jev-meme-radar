@@ -1,4 +1,4 @@
-import { experimental_evaluate as evaluate } from "ai";
+import { experimental_evaluate as evaluate, generateText } from "ai";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -92,45 +92,25 @@ async function jevRank(items:Meme[]) {
   })).sort((a,b)=>b.score-a.score || b.confidence-a.confidence);
 }
 
-function extractOutputText(j:any) {
-  if (typeof j?.output_text === "string") return j.output_text;
-  const parts:string[] = [];
-  for (const o of (j?.output || [])) {
-    for (const c of (o?.content || [])) {
-      if (typeof c?.text === "string") parts.push(c.text);
-    }
-  }
-  return parts.join("\n");
-}
-
 async function visionBatch(items:Meme[]) {
-  const token = process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN;
-  if (!token) return items.map((m,i)=>({index:i,visual:""}));
-
   const content:any[] = [{
-    type:"input_text",
+    type:"text",
     text:"You are inspecting meme images for a ranking system. For each numbered image, briefly state the visible meme text/OCR, what is visually happening, and the joke/idea if inferable. Return EXACTLY one line per image in format NUMBER|DESCRIPTION. Keep each description under 45 words."
   }];
+
   items.forEach((m,i)=>{
-    content.push({type:"input_text", text:`IMAGE ${i}: title=${m.title || ""}`});
-    content.push({type:"input_image", image_url:m.url, detail:"low"});
+    content.push({type:"text", text:`IMAGE ${i}: title=${m.title || ""}`});
+    content.push({type:"file", mediaType:"image", data:new URL(String(m.url))});
   });
 
   try {
-    const r = await fetch("https://ai-gateway.vercel.sh/v1/responses", {
-      method:"POST",
-      headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},
-      body:JSON.stringify({
-        model:"google/gemini-3.5-flash-lite",
-        input:[{role:"user",content}],
-        max_output_tokens:1800,
-      }),
+    const result = await generateText({
+      model:"openai/gpt-5.6-luna",
+      maxOutputTokens:1800,
+      messages:[{role:"user",content}],
     });
-    if (!r.ok) return items.map((m,i)=>({index:i,visual:""}));
-    const j = await r.json();
-    const text = extractOutputText(j);
     const map = new Map<number,string>();
-    for (const line of text.split("\n")) {
+    for (const line of result.text.split("\n")) {
       const match = line.match(/^\s*(\d+)\s*\|\s*(.+)$/);
       if (match) map.set(Number(match[1]), match[2].trim());
     }
