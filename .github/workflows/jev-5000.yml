@@ -1,5 +1,5 @@
 name: Jev 5000 Meme Rank
-# trigger-v3-public-prod
+# trigger-v4-cancel-old
 
 on:
   push:
@@ -10,6 +10,10 @@ on:
 permissions:
   id-token: write
   contents: write
+
+concurrency:
+  group: jev-5000-ranking
+  cancel-in-progress: true
 
 jobs:
   rank:
