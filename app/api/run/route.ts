@@ -38,6 +38,8 @@ function compact(value: any, depth = 0): any {
   return String(value);
 }
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 async function scoreBatch(items: any[], offset: number) {
   const questions: Record<string, any> = {};
   for (let i = 0; i < items.length; i++) {
@@ -49,11 +51,26 @@ async function scoreBatch(items: any[], offset: number) {
     };
   }
 
-  const result = await evaluate({
-    model: "typesafe-ai/jev",
-    state: items.map(compact),
-    questions,
-  });
+  let result: any;
+  let lastError: any;
+  for (let attempt = 0; attempt < 7; attempt++) {
+    try {
+      result = await evaluate({
+        model: "typesafe-ai/jev",
+        state: items.map(compact),
+        questions,
+        maxRetries: 2,
+      });
+      lastError = null;
+      break;
+    } catch (error: any) {
+      lastError = error;
+      const text = String(error?.message ?? error);
+      if (!/429|rate.limit|high demand|504|timed out/i.test(text) || attempt === 6) throw error;
+      await sleep(1200 * Math.pow(1.7, attempt));
+    }
+  }
+  if (!result) throw lastError;
 
   const confidence = (result.providerMetadata as any)?.typesafe?.confidence ?? {};
   return items.map((item, i) => {
@@ -89,8 +106,9 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const limit = Math.min(Math.max(Number(searchParams.get("limit") ?? 5000), 1), 5000);
   const offset = Math.min(Math.max(Number(searchParams.get("offset") ?? 0), 0), 4999);
-  const batchSize = Math.min(Math.max(Number(searchParams.get("batch") ?? 50), 10), 100);
-  const concurrency = Math.min(Math.max(Number(searchParams.get("concurrency") ?? 8), 1), 12);
+  const batchSize = Math.min(Math.max(Number(searchParams.get("batch") ?? 100), 10), 100);
+  const concurrency = Math.min(Math.max(Number(searchParams.get("concurrency") ?? 1), 1), 4);
+  const pauseMs = Math.min(Math.max(Number(searchParams.get("pause") ?? 350), 0), 5000);
 
   // Temporary safety gate for the 5k benchmark: prevent stale parallel
   // workflow runs from hammering Jev and triggering upstream 429s.
@@ -128,7 +146,10 @@ export async function GET(req: Request) {
   const scoredBatches = await mapWithConcurrency(
     batches,
     concurrency,
-    async batch => scoreBatch(batch.items, batch.offset),
+    async (batch, batchIndex) => {
+      if (pauseMs > 0 && batchIndex > 0) await sleep(pauseMs * batchIndex / Math.max(1, concurrency));
+      return scoreBatch(batch.items, batch.offset);
+    },
   );
   const scored = scoredBatches.flat();
   scored.sort((a, b) => b.score - a.score || (b.confidence ?? 0) - (a.confidence ?? 0));
@@ -142,6 +163,7 @@ export async function GET(req: Request) {
     batchSize,
     batches: batches.length,
     concurrency,
+    pauseMs,
     elapsedMs: Date.now() - startedAt,
     top20: scored.slice(0, 20),
   });
