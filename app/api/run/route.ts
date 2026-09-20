@@ -88,6 +88,7 @@ async function mapWithConcurrency<T, R>(
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const limit = Math.min(Math.max(Number(searchParams.get("limit") ?? 5000), 1), 5000);
+  const offset = Math.min(Math.max(Number(searchParams.get("offset") ?? 0), 0), 4999);
   const batchSize = Math.min(Math.max(Number(searchParams.get("batch") ?? 50), 10), 100);
   const concurrency = Math.min(Math.max(Number(searchParams.get("concurrency") ?? 8), 1), 12);
 
@@ -107,10 +108,11 @@ export async function GET(req: Request) {
     .replace(/\bNaN\b/g, "null")
     .replace(/-?\bInfinity\b/g, "null");
   const raw = JSON.parse(sanitized);
-  const all = (Array.isArray(raw) ? raw : Object.values(raw ?? {})).slice(0, limit);
+  const sourceItems = Array.isArray(raw) ? raw : Object.values(raw ?? {});
+  const all = sourceItems.slice(offset, offset + limit);
   const batches: { items: any[]; offset: number }[] = [];
   for (let i = 0; i < all.length; i += batchSize) {
-    batches.push({ items: all.slice(i, i + batchSize), offset: i });
+    batches.push({ items: all.slice(i, i + batchSize), offset: offset + i });
   }
 
   const startedAt = Date.now();
@@ -126,6 +128,7 @@ export async function GET(req: Request) {
     source: "MemeCap train+val",
     sourceUrl,
     requested: limit,
+    offset,
     evaluated: scored.length,
     batchSize,
     batches: batches.length,
