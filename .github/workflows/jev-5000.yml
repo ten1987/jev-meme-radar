@@ -1,5 +1,5 @@
 name: Jev 5000 Meme Rank
-# trigger-v4-cancel-old
+# trigger-v5-serial
 
 on:
   push:
@@ -43,7 +43,7 @@ jobs:
           TOKEN = os.environ["OIDC_TOKEN"]
 
           def fetch_block(offset):
-              url = f"{BASE}?limit=100&offset={offset}&batch=25&concurrency=4"
+              url = f"{BASE}?limit=100&offset={offset}&batch=20&concurrency=1"
               req = urllib.request.Request(
                   url,
                   headers={
@@ -52,7 +52,7 @@ jobs:
                   }
               )
               last = None
-              for attempt in range(4):
+              for attempt in range(8):
                   try:
                       with urllib.request.urlopen(req, timeout=120) as r:
                           if r.status != 200:
@@ -63,12 +63,12 @@ jobs:
                           return data
                   except Exception as e:
                       last = e
-                      time.sleep(2 * (attempt + 1))
+                      time.sleep(min(30, 3 * (attempt + 1)))
               raise RuntimeError(f"offset {offset} failed: {last}")
 
           offsets = list(range(0, 5000, 100))
           blocks = []
-          with ThreadPoolExecutor(max_workers=5) as ex:
+          with ThreadPoolExecutor(max_workers=1) as ex:
               futs = {ex.submit(fetch_block, o): o for o in offsets}
               for fut in as_completed(futs):
                   o = futs[fut]
