@@ -92,6 +92,15 @@ export async function GET(req: Request) {
   const batchSize = Math.min(Math.max(Number(searchParams.get("batch") ?? 50), 10), 100);
   const concurrency = Math.min(Math.max(Number(searchParams.get("concurrency") ?? 8), 1), 12);
 
+  // Temporary safety gate for the 5k benchmark: prevent stale parallel
+  // workflow runs from hammering Jev and triggering upstream 429s.
+  if (concurrency > 1) {
+    return Response.json(
+      { error: "Benchmark is temporarily limited to concurrency=1" },
+      { status: 429 },
+    );
+  }
+
   const sourceUrl =
     "https://raw.githubusercontent.com/eujhwang/meme-cap/main/data/memes-trainval.json";
 
