@@ -1,62 +1,63 @@
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-function isImagePost(p: any) {
-  const raw = String(p?.url_overridden_by_dest || p?.url || "");
-  const clean = raw.split("?")[0].toLowerCase();
-  return [".jpg", ".jpeg", ".png", ".webp"].some(ext => clean.endsWith(ext)) || p?.post_hint === "image";
-}
+type Meme = {
+  postLink?: string;
+  subreddit?: string;
+  title?: string;
+  url?: string;
+  nsfw?: boolean;
+  spoiler?: boolean;
+  author?: string;
+  ups?: number;
+  preview?: string[];
+};
 
 export async function GET() {
-  const sources: Array<[string, string]> = [
-    ["memes","hot"],["memes","new"],
-    ["dankmemes","hot"],["dankmemes","new"],
-    ["me_irl","hot"],["me_irl","new"],
-    ["wholesomememes","hot"],["wholesomememes","new"],
-    ["AdviceAnimals","hot"],["AdviceAnimals","new"],
+  const subs = [
+    "memes",
+    "dankmemes",
+    "me_irl",
+    "meirl",
+    "wholesomememes",
+    "AdviceAnimals",
+    "starterpacks",
+    "comedyheaven",
+    "HistoryMemes",
+    "ProgrammerHumor",
+    "PrequelMemes",
+    "lotrmemes",
   ];
-  const all: any[] = [];
 
-  for (const [sub, sort] of sources) {
-    const u = `https://www.reddit.com/r/${sub}/${sort}.json?limit=100&raw_json=1`;
+  const all: Meme[] = [];
+  for (const sub of subs) {
     try {
-      const r = await fetch(u, {
-        headers: { "User-Agent": "jev-meme-radar/1.0 by u/ten1987" },
-        cache: "no-store",
-      });
+      const r = await fetch(`https://meme-api.com/gimme/${sub}/50`, { cache: "no-store" });
       if (!r.ok) continue;
       const j: any = await r.json();
-      for (const c of j?.data?.children || []) {
-        const p = c.data;
-        if (!isImagePost(p)) continue;
-        all.push({
-          id: p.id,
-          subreddit: p.subreddit,
-          title: p.title,
-          image: p.url_overridden_by_dest || p.url,
-          permalink: "https://www.reddit.com" + p.permalink,
-          score: p.score,
-          upvote_ratio: p.upvote_ratio,
-          comments: p.num_comments,
-          created_utc: p.created_utc,
-          over_18: p.over_18,
-          sort,
-        });
+      const memes: Meme[] = Array.isArray(j?.memes) ? j.memes : [];
+      for (const m of memes) {
+        if (m.nsfw || m.spoiler || !m.url || !m.postLink) continue;
+        const clean = m.url.split("?")[0].toLowerCase();
+        if (![".jpg",".jpeg",".png",".webp"].some(ext => clean.endsWith(ext))) continue;
+        all.push(m);
       }
     } catch {
-      // Ignore one failed source and keep the rest.
+      // skip failed subreddit
     }
   }
 
-  const byId = new Map<string, any>();
-  for (const p of all) {
-    if (p.over_18) continue;
-    if (!byId.has(p.id)) byId.set(p.id, p);
-  }
+  const seen = new Set<string>();
+  const items = all.filter(m => {
+    const key = m.postLink || m.url || "";
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 500);
 
-  const items = [...byId.values()]
-    .sort((a, b) => b.created_utc - a.created_utc)
-    .slice(0, 500);
-
-  return Response.json({ count: items.length, sample: items.slice(0, 5), items });
+  return Response.json({
+    count: items.length,
+    source: "meme-api.com live Reddit feed",
+    items,
+  });
 }
