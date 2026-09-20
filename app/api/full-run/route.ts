@@ -92,17 +92,29 @@ async function run(runId:string){
     if(all.length!==500)throw new Error(`snapshot count ${all.length}`);
     console.log("RUN_PROGRESS",runId,"snapshot",all.length);
 
+    const jobs:Array<{start:number;items:Meme[]}>= [];
+    for(let start=0;start<500;start+=20){
+      jobs.push({start,items:all.slice(start,start+20)});
+    }
+    let cursor=0;
+    const workers=Array.from({length:Math.min(8,jobs.length)},async()=>{
+      while(true){
+        const n=cursor++;
+        if(n>=jobs.length)break;
+        const job=jobs[n];
+        const map=await vision(job.items,job.start);
+        job.items.forEach((m,k)=>{m.visual=map.get(job.start+k)||"";});
+        console.log("RUN_PROGRESS",runId,"vision",job.start+20,"missing",job.items.filter(x=>!x.visual).length);
+        await sleep(150);
+      }
+    });
+    await Promise.all(workers);
+    console.log("RUN_PROGRESS",runId,"vision-complete","missing",all.filter(x=>!x.visual).length);
+
     const semis:Meme[]=[];
     for(let g=0;g<5;g++){
       const start=g*100;
-      const group=all.slice(start,start+100).map(x=>({...x}));
-      for(let j=0;j<100;j+=20){
-        const batch=group.slice(j,j+20);
-        const map=await vision(batch,start+j);
-        batch.forEach((m,k)=>{m.visual=map.get(start+j+k)||"";});
-        console.log("RUN_PROGRESS",runId,`group${g}-vision`,j+20,"missing",batch.filter(x=>!x.visual).length);
-        await sleep(250);
-      }
+      const group=all.slice(start,start+100);
       const missing=group.filter(x=>!x.visual).length;
       const ranked=await jevRank(group,`group-${g}`);
       semis.push(...ranked.slice(0,20).map(x=>x.item));
