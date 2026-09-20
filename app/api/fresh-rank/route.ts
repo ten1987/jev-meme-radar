@@ -39,27 +39,29 @@ async function fetchMemes(): Promise<Meme[]> {
     "HarryPotterMemes","marvelmemes","AnimeMemes","dogelore","surrealmemes",
     "MinecraftMemes","gamingmemes","CleanMemes",
   ];
-  const all:Meme[] = [];
-  for (const sub of subs) {
-    try {
-      const r = await fetch(`https://meme-api.com/gimme/${sub}/50`, { cache:"no-store" });
-      if (!r.ok) continue;
-      const j:any = await r.json();
-      for (const m of (Array.isArray(j?.memes) ? j.memes : [])) {
-        if (m.nsfw || m.spoiler || !m.url || !m.postLink) continue;
-        const clean = String(m.url).split("?")[0].toLowerCase();
-        if (![".jpg",".jpeg",".png",".webp"].some(ext => clean.endsWith(ext))) continue;
-        all.push(m);
-      }
-    } catch {}
-  }
   const seen = new Set<string>();
-  return all.filter(m => {
-    const k = m.postLink || m.url || "";
-    if (!k || seen.has(k)) return false;
-    seen.add(k);
-    return true;
-  }).slice(0,500);
+  const all:Meme[] = [];
+  for (let round = 0; round < 3 && all.length < 500; round++) {
+    for (const sub of subs) {
+      if (all.length >= 500) break;
+      try {
+        const r = await fetch(`https://meme-api.com/gimme/${sub}/50?round=${round}&t=${Date.now()}`, { cache:"no-store" });
+        if (!r.ok) continue;
+        const j:any = await r.json();
+        for (const m of (Array.isArray(j?.memes) ? j.memes : [])) {
+          if (m.nsfw || m.spoiler || !m.url || !m.postLink) continue;
+          const clean = String(m.url).split("?")[0].toLowerCase();
+          if (![".jpg",".jpeg",".png",".webp"].some(ext => clean.endsWith(ext))) continue;
+          const k = m.postLink || m.url || "";
+          if (!k || seen.has(k)) continue;
+          seen.add(k);
+          all.push(m);
+          if (all.length >= 500) break;
+        }
+      } catch {}
+    }
+  }
+  return all.slice(0,500);
 }
 
 async function jevRank(items:Meme[]) {
@@ -111,7 +113,7 @@ async function visionBatch(items:Meme[]) {
     });
     const map = new Map<number,string>();
     for (const line of result.text.split("\n")) {
-      const match = line.match(/^\s*(\d+)\s*\|\s*(.+)$/);
+      const match = line.match(/^\s*(?:[-*]\s*)?(?:IMAGE\s*)?(\d+)\s*(?:\||:|[-–—])\s*(.+)$/i);
       if (match) map.set(Number(match[1]), match[2].trim());
     }
     return items.map((m,i)=>({index:i,visual:map.get(i) || ""}));
