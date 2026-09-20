@@ -1,0 +1,4 @@
+import { experimental_evaluate as evaluate } from "ai";
+export async function POST(req:Request){const ct=req.headers.get("content-type")||"";let text="";if(ct.includes("application/json")){text=(await req.json()).text||""}else{const f=await req.formData();text=String(f.get("text")||"")}
+if(!text)return Response.json({error:"text required"},{status:400});
+const result=await evaluate({model:"typesafe-ai/jev",state:text,questions:{funny:{type:"score",instructions:"How strong is the meme's humor and immediate comedic payoff?",min:1,max:10},shareable:{type:"score",instructions:"How likely is this meme concept to feel broadly relatable and worth sharing?",min:1,max:10},keep:{type:"boolean",instructions:"Should this meme advance to a smaller candidate pool for human review?"}}});return Response.json({answers:result.answers,providerMetadata:result.providerMetadata});}
