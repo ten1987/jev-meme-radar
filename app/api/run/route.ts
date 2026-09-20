@@ -102,7 +102,11 @@ export async function GET(req: Request) {
     );
   }
 
-  const raw = await sourceRes.json();
+  const sourceText = await sourceRes.text();
+  const sanitized = sourceText
+    .replace(/:\\s*NaN(?=\\s*[,}])/g, ": null")
+    .replace(/:\\s*-?Infinity(?=\\s*[,}])/g, ": null");
+  const raw = JSON.parse(sanitized);
   const all = (Array.isArray(raw) ? raw : Object.values(raw ?? {})).slice(0, limit);
   const batches: { items: any[]; offset: number }[] = [];
   for (let i = 0; i < all.length; i += batchSize) {
