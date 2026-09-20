@@ -35,6 +35,9 @@ async function fetchMemes(): Promise<Meme[]> {
   const subs = [
     "memes","dankmemes","me_irl","meirl","wholesomememes","AdviceAnimals",
     "starterpacks","comedyheaven","HistoryMemes","ProgrammerHumor","PrequelMemes","lotrmemes",
+    "MemeEconomy","terriblefacebookmemes","BikiniBottomTwitter","SequelMemes",
+    "HarryPotterMemes","marvelmemes","AnimeMemes","dogelore","surrealmemes",
+    "MinecraftMemes","gamingmemes","CleanMemes",
   ];
   const all:Meme[] = [];
   for (const sub of subs) {
