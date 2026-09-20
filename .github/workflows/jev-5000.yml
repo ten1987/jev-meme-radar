@@ -1,5 +1,5 @@
 name: Jev 5000 Meme Rank
-# trigger-v2
+# trigger-v3-public-prod
 
 on:
   push:
@@ -35,7 +35,7 @@ jobs:
           import json, os, urllib.request, urllib.error, time
           from concurrent.futures import ThreadPoolExecutor, as_completed
 
-          BASE = "https://jev-meme-radar-door-proof.vercel.app/api/run"
+          BASE = "https://jev-meme-radar.vercel.app/api/run"
           TOKEN = os.environ["OIDC_TOKEN"]
 
           def fetch_block(offset):
