@@ -147,7 +147,7 @@ export async function GET(req: Request) {
     batches,
     concurrency,
     async (batch, batchIndex) => {
-      if (pauseMs > 0 && batchIndex > 0) await sleep(pauseMs * batchIndex / Math.max(1, concurrency));
+      if (pauseMs > 0 && batchIndex > 0) await sleep(pauseMs);
       return scoreBatch(batch.items, batch.offset);
     },
   );
